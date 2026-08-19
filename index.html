@@ -76,93 +76,124 @@
       </div>
 
       <hr>
-      <label for="importHtmlFile">Import standalone HTML</label>
-      <input type="file" id="importHtmlFile" accept=".html">
-      <button type="button" class="secondary" onclick="importStandaloneHtml()">Import HTML</button>
+      <label for="importHtmlFile">Import AI / standalone file</label>
+      <input type="file" id="importHtmlFile" accept=".html,.json,text/html,application/json">
+      <button type="button" class="secondary" onclick="importStandaloneHtml()">Import File</button>
 
       <details class="ai-import-help">
         <summary id="aiImportHelpTitle">Convert a Word or PowerPoint quiz</summary>
         <div class="ai-import-help-content">
-          <p>To convert a Word or PowerPoint quiz file into this builder:</p>
+          <p>For most storyboards, use <strong>Fast conversion</strong>. It asks the AI to extract the content and maths, while the builder standardises predictable equation layout after import.</p>
+          <label for="aiPromptMode">AI conversion mode</label>
+          <select id="aiPromptMode" onchange="updateAiPromptModeUi()">
+            <option value="fast" selected>Fast conversion (recommended)</option>
+            <option value="fidelity">High fidelity</option>
+          </select>
+          <p class="ai-prompt-mode-note" id="aiPromptModeNote"></p>
           <ol>
-            <li>Copy the prompt below.</li>
+            <li>Choose a conversion mode and copy its prompt.</li>
             <li>Open <a href="https://claude.ai/" target="_blank" rel="noopener noreferrer">Claude</a> or <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPT</a>.</li>
             <li>Paste the prompt and upload your <strong>.docx</strong> or <strong>.pptx</strong> file.</li>
-            <li>Download the HTML file the AI returns.</li>
-            <li>Use <strong>Import Standalone HTML</strong> above to load it into the builder.</li>
+            <li>Download the <strong>.json</strong> file the AI returns.</li>
+            <li>Use <strong>Import File</strong> above. Existing standalone <strong>.html</strong> files are still supported.</li>
           </ol>
-          <button type="button" class="secondary copy-prompt-button" id="copyPromptButton" onclick="copyAiPrompt()">Copy Prompt</button>
-          <textarea id="aiPrompt" class="visually-hidden" aria-hidden="true" tabindex="-1">I have a quiz in the attached Word/PowerPoint file. Please convert it into the following standalone HTML format so I can import it into my quiz builder.
+          <button type="button" class="secondary copy-prompt-button" id="copyPromptButton" onclick="copyAiPrompt()">Copy Fast Prompt</button>
+          <textarea id="aiPromptFast" class="visually-hidden" aria-hidden="true" tabindex="-1">I have a quiz in the attached Word or PowerPoint file. Extract the quiz content into a JSON file for my quiz builder.
+
+FAST MODE — PRIORITISE ACCURATE EXTRACTION AND COMPACT OUTPUT.
+Do not recreate the overall slide/template design, decorative characters, buttons, feedback artwork or other template decoration. Only reproduce content that belongs inside the quiz title, question, answer or feedback content. Reproduce a graph/diagram only when it is part of the question/answer/feedback and is needed to understand or answer it.
+
+CONTENT RULES:
+- Extract every quiz question, all 4 answer options, the correct answer, and the feedback text.
+- Preserve the source wording exactly. Do not rewrite, improve, correct, simplify or add content.
+- Keep answers in source order. correctIndex is 0 for Answer 1, 1 for Answer 2, 2 for Answer 3 and 3 for Answer 4.
+- Preserve only source-visible emphasis such as bold, italic, underline, superscript, subscript, lists and special characters.
+- Keep ordinary prose as plain text/HTML with as few wrappers as possible. Do not add unnecessary p, div or span elements.
+
+MATHEMATICS:
+- Use semantic MathML for structured maths: fractions, roots, powers, subscripts, brackets, matrices, limits and nested expressions.
+- Preserve the mathematical structure exactly. Do not solve, rearrange, simplify or replace a structured equation with plain-text notation.
+- Inline maths must remain inline within its sentence. Never split surrounding prose around an inline equation.
+- Use display='block' only when the source equation is visibly on its own line.
+- For EVERY display equation, add data-qb-align='left', data-qb-align='center' or data-qb-align='right' to match the source alignment.
+- Keep equations natural width. Do NOT set width:100%, min-width, flex-grow, large margins, font-size, font-weight, colour, padding, transforms, mathvariant or mstyle on MathML.
+- Do not style mfrac or create a fraction rule wider than its numerator/denominator. The builder will standardise display-math sizing after import.
+- Use mi for variables, mn for numbers, mo for operators and mtext only for upright words genuinely inside the equation.
+
+ESSENTIAL VISUALS:
+- If a graph/diagram is required for the question, reproduce it as compact SVG and preserve its approximate source size, proportions, labels, line styles and alignment.
+- The quiz builder question box is 426 × 140 px with about 396 × 130 px usable inner space. The question text plus any essential visual must fit within that space. Never enlarge a source visual.
+- Do not recreate decorative images or feedback illustrations; the builder supplies those.
+
+Return ONLY a downloadable .json file with this structure and no explanation:
+
+{
+  "title": "Quiz title",
+  "filename": "suggested_filename",
+  "questions": [
+    {
+      "question": "Question text; HTML and MathML are allowed",
+      "answers": ["Answer 1", "Answer 2", "Answer 3", "Answer 4"],
+      "correctIndex": 0,
+      "feedback": "Feedback text"
+    }
+  ]
+}
+
+If there is no feedback, use an empty string. Use single quotes for HTML/MathML attribute values inside JSON strings where practical so the JSON remains valid. Do not perform a lengthy visual redesign or commentary pass. Extract faithfully, generate the JSON file, and stop.</textarea>
+          <textarea id="aiPromptFidelity" class="visually-hidden" aria-hidden="true" tabindex="-1">I have a quiz in the attached Word or PowerPoint file. Convert its quiz content into a JSON file for my quiz builder with high visual fidelity.
 
 IMPORTANT RULES — CONTENT AND VISUAL FIDELITY:
 - Extract every question, all 4 answer options, which answer is correct, and the feedback text.
 - Treat the source file as the visual authority. Preserve the source wording, line/paragraph breaks, emphasis and mathematical notation as closely as possible.
 - Do NOT improve, modernise, restyle, simplify or embellish the source. Do not add bold, italic, underline, colours, font sizes, margins, padding, extra blank lines, extra paragraph wrappers or other styling unless that styling is clearly present in the source.
 - Preserve only formatting that is genuinely visible in the source: bold, italic, underline, superscript, subscript, lists and special characters (±, ×, ÷, π, √, °, ≤, ≥).
-- Keep normal prose as plain HTML text whenever possible. Do not wrap ordinary single lines in unnecessary &lt;p&gt;, &lt;div&gt; or &lt;span&gt; elements. Add a block/line break only where the source visibly has one.
+- Keep normal prose as plain HTML text whenever possible. Do not wrap ordinary single lines in unnecessary p, div or span elements. Add a block/line break only where the source visibly has one.
+- Ignore the surrounding Storyline/quiz template decoration, buttons, decorative people and feedback artwork. The builder supplies those separately.
 
 MATHEMATICS — VERY IMPORTANT:
 - Preserve the visual mathematical structure from the Word/PowerPoint source as closely as possible. Do not rewrite a professionally formatted equation as plain text merely because the meaning is equivalent.
-- For structured equations, use semantic MathML inside the question/answer/feedback HTML strings. Use the appropriate MathML structures for fractions, roots, superscripts, subscripts, combined scripts, brackets, matrices/tables, limits, operators and nested expressions.
+- For structured equations, use semantic MathML inside the question/answer/feedback strings. Use the appropriate MathML structures for fractions, roots, superscripts, subscripts, combined scripts, brackets, matrices/tables, limits, operators and nested expressions.
 - Preserve stacked fractions as stacked fractions, roots with their full radicands, and the original grouping/bracket structure. Do not flatten a fraction to a/b, do not replace a structured equation with Unicode-only text, and do not simplify, solve, rearrange or reinterpret any equation.
-- Use &lt;mi&gt; for mathematical identifiers/variables, &lt;mn&gt; for numbers, &lt;mo&gt; for operators and &lt;mtext&gt; only for upright words that are genuinely part of the equation.
-- Do NOT add MathML styling such as font-size, font-weight, colour, margins, padding, transforms, mathvariant or &lt;mstyle&gt; unless the source visibly requires it. Let the quiz builder supply the surrounding typography.
-- Match whether maths is inline or displayed on its own line. Use display='block' only when the source equation is visibly on a separate line. Do not turn inline maths into display maths.
-- Inline maths MUST remain part of the surrounding sentence/line. Never put inline MathML in its own &lt;div&gt;, &lt;p&gt; or line merely because it is an equation. Do not split prose into separate layout fragments around inline maths.
-- Example: if the source shows “f(x) = −6x + 8 for a given x value of 2.” on one line, keep that whole sequence in one normal inline flow with the MathML embedded between the words. Do not wrap the formula-and-prose line in a separate &lt;div&gt;.
-- A display equation being on its own line does NOT mean it should automatically be centred. Browser MathML often centres display equations by default. Preserve the source horizontal alignment explicitly: for a source equation that is on its own line and left aligned, use &lt;math display='block' style='display:block;text-align:left;margin:0'&gt;...&lt;/math&gt;. Use text-align:center only when the source equation is visibly centred.
+- Use mi for mathematical identifiers/variables, mn for numbers, mo for operators and mtext only for upright words that are genuinely part of the equation.
+- Do NOT add MathML styling such as font-size, font-weight, colour, padding, transforms, mathvariant or mstyle unless the source visibly requires it.
+- Inline maths MUST remain part of the surrounding sentence/line. Never put inline MathML in its own div, p or line merely because it is an equation. Do not split prose into separate layout fragments around inline maths.
+- Use display='block' only when the source equation is visibly on a separate line.
+- For EVERY display equation, add data-qb-align='left', data-qb-align='center' or data-qb-align='right' to match its actual source alignment. Do not rely on browser default centring.
+- Keep every display equation natural width. Do NOT use width:100%, min-width, flex-grow or styling that stretches an mfrac across its container. The builder normalises display-math sizing after import.
 - Preserve the source sequence and spacing around equations. Do not insert extra blank lines before or after display equations.
-- When MathML attributes are needed inside a JSON string, use single quotes for the HTML attribute values where practical, or correctly escape any double quotes so the JavaScript array remains valid JSON.
 
 DIAGRAMS, GRAPHS AND IMAGES — VERY IMPORTANT:
-- Reproduce diagrams/graphs/images only when they actually appear inside the question, answer or feedback content. Do not invent decorative visuals.
+- Reproduce diagrams/graphs/images only when they actually appear inside the question, answer or feedback content and matter to that content. Do not invent decorative visuals.
 - If a PowerPoint visual is made from grouped shapes, lines and labels, reproduce it as SVG rather than approximating it with a different-looking graph. Match the original geometry, colours, line styles, arrowheads, dashed lines, label positions, font family, font weight and relative font size.
-- Preserve the visual's displayed size AND its horizontal alignment/indent relative to the source text box. If it is centred, centred-within-an-indent, or deliberately left/right aligned in the source, reproduce that placement; do not automatically left-align or centre it. Inline layout styling is allowed for a source visual only when needed to reproduce that original placement.
+- Preserve the visual's displayed size AND its horizontal alignment/indent relative to the source text box. If it is centred, centred-within-an-indent, or deliberately left/right aligned in the source, reproduce that placement; do not automatically left-align or centre it.
 - Preserve the visual's displayed size relative to the source slide. For a PowerPoint slide, map source dimensions to the quiz builder's 720 × 540 design canvas: targetWidth = sourceVisualWidth / sourceSlideWidth × 720 and targetHeight = sourceVisualHeight / sourceSlideHeight × 540. Do not enlarge a source visual.
-- The builder's question box is 426 × 140 px on that 720 × 540 canvas, with approximately 396 × 130 px of usable inner space. Any visual placed inside the question text must fit inside the remaining space together with the question text. It must never extend outside or be clipped by the question box.
-- Do not choose an arbitrary large SVG width/height merely because the SVG viewBox is large. The rendered width/height must match the source visual's displayed size. If a larger viewBox is used, compensate the SVG font sizes and stroke widths so the rendered result still matches the source.
-- Do not substitute Arial or another font if the source uses a different font. Inspect and preserve the source font where possible; otherwise inherit the surrounding quiz font rather than inventing a new one.
+- The builder's question box is 426 × 140 px on that canvas, with approximately 396 × 130 px usable inner space. Any visual placed inside the question must fit inside the remaining space together with the question text.
+- Do not choose an arbitrary large SVG width/height merely because the SVG viewBox is large. The rendered size must match the source visual's displayed size.
+- Do not substitute Arial or another font if the source uses a different font. Preserve the source font where practical; otherwise inherit the surrounding quiz font rather than inventing a new one.
 - For raster images, preserve aspect ratio. Never stretch, crop or enlarge an image unless the source itself does so.
 
 DATA RULES:
-- If there is no feedback for a question, leave the feedback field as an empty string "".
-- Output ONLY the HTML file — no explanation and no markdown code fences.
+- If there is no feedback for a question, use an empty string.
+- Keep answers in source order. correctIndex is 0 for Answer 1, 1 for Answer 2, 2 for Answer 3 and 3 for Answer 4.
+- Use single quotes for HTML/MathML attribute values inside JSON strings where practical so the JSON remains valid.
 
-The HTML file must contain this exact JavaScript data structure:
+Return ONLY a downloadable .json file with this structure and no explanation:
 
-const originalQuizData = [
-  {
-    "question": "Question text here (HTML and MathML are allowed)",
-    "answers": [
-      "Answer 1 text",
-      "Answer 2 text",
-      "Answer 3 text",
-      "Answer 4 text"
-    ],
-    "correctIndex": 0,
-    "feedback": "Feedback text here"
-  }
-];
+{
+  "title": "Quiz title",
+  "filename": "suggested_filename",
+  "questions": [
+    {
+      "question": "Question text; HTML and MathML are allowed",
+      "answers": ["Answer 1", "Answer 2", "Answer 3", "Answer 4"],
+      "correctIndex": 0,
+      "feedback": "Feedback text"
+    }
+  ]
+}
 
-Where correctIndex is 0 for Answer 1, 1 for Answer 2, 2 for Answer 3, 3 for Answer 4.
-
-Example of the required maths approach: a source fraction with x squared over y should remain a real fraction using MathML such as &lt;math&gt;&lt;mfrac&gt;&lt;msup&gt;&lt;mi&gt;x&lt;/mi&gt;&lt;mn&gt;2&lt;/mn&gt;&lt;/msup&gt;&lt;mi&gt;y&lt;/mi&gt;&lt;/mfrac&gt;&lt;/math&gt;, not plain text like x²/y.
-
-Wrap it in this minimal HTML shell:
-
-&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;&lt;title&gt;Quiz Title Here&lt;/title&gt;&lt;/head&gt;
-&lt;body&gt;
-&lt;script&gt;
-const originalQuizData = [ ... your data here ... ];
-&lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;
-
-Before returning the file, compare every generated question visually against the source slide/page. In particular, verify equation layout, source emphasis, paragraph breaks, diagram size and diagram proportions. If your generated HTML introduces styling that is not visibly present in the source, remove it.
-
-Please convert the attached file now and return only the HTML file.</textarea>
+Before returning the file, check the generated quiz content against the source for equation structure/alignment, wording, paragraph breaks and essential diagram sizing. Remove styling that is not visibly present in the source. Return only the JSON file.</textarea>
         </div>
       </details>
     </aside>

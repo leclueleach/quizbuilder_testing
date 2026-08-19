@@ -1254,53 +1254,149 @@ for (const name of EXPORT_IMAGE_FILES) {
 
 function importStandaloneHtml() {
   const file = document.getElementById("importHtmlFile").files[0];
-  if (!file) { alert("Please select an HTML file first."); return; }
+  if (!file) { alert("Please select an HTML or JSON file first."); return; }
 
   readFile(file, text => {
-    const dataMatch  = text.match(/const originalQuizData = (\[[\s\S]*?\]);/);
-    if (!dataMatch) { alert("Could not find quiz data in this HTML file."); return; }
+    try {
+      const isJson = /\.json$/i.test(file.name) || /^\s*[\[{]/.test(text);
+      let questions;
+      let title = "Imported Quiz";
+      let filename = file.name.replace(/\.(html?|json)$/i, "");
+      let randomizeExport = true;
+      let randomizeAnswersExport = true;
 
-    const questions = JSON.parse(dataMatch[1]);
+      if (isJson) {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          questions = parsed;
+        } else if (parsed && typeof parsed === "object") {
+          questions = parsed.questions;
+          if (typeof parsed.title === "string" && parsed.title.trim()) title = parsed.title;
+          if (typeof parsed.filename === "string" && parsed.filename.trim()) filename = parsed.filename;
+          if (typeof parsed.randomizeExport === "boolean") randomizeExport = parsed.randomizeExport;
+          if (typeof parsed.randomizeAnswersExport === "boolean") randomizeAnswersExport = parsed.randomizeAnswersExport;
+        }
+        if (!Array.isArray(questions)) throw new Error("Could not find a questions array in this JSON file.");
+      } else {
+        const dataMatch = text.match(/const originalQuizData = (\[[\s\S]*?\]);/);
+        if (!dataMatch) throw new Error("Could not find quiz data in this HTML file.");
+        questions = JSON.parse(dataMatch[1]);
 
-    // Prefer quiz-title meta (preserves rich HTML), fall back to <title>
-    const quizTitleMatch = text.match(/<meta name="quiz-title" content="([^"]*)">/);
-    const titleTagMatch  = text.match(/<title>(.*?)<\/title>/);
-    const title = quizTitleMatch ? quizTitleMatch[1] : (titleTagMatch ? titleTagMatch[1] : "Imported Quiz");
+        // Prefer quiz-title meta (preserves rich HTML), fall back to <title>.
+        const quizTitleMatch = text.match(/<meta name="quiz-title" content="([^"]*)">/);
+        const titleTagMatch = text.match(/<title>(.*?)<\/title>/);
+        title = quizTitleMatch ? quizTitleMatch[1] : (titleTagMatch ? titleTagMatch[1] : "Imported Quiz");
 
-    // Filename: prefer meta tag, fall back to the uploaded file's own name
-    const filenameMatch = text.match(/<meta name="quiz-filename" content="([^"]*)">/);
-    const filename = (filenameMatch && filenameMatch[1])
-      ? filenameMatch[1]
-      : file.name.replace(/\.html$/i, "");
+        // Filename: prefer meta tag, fall back to the uploaded file's own name.
+        const filenameMatch = text.match(/<meta name="quiz-filename" content="([^"]*)">/);
+        filename = (filenameMatch && filenameMatch[1])
+          ? filenameMatch[1]
+          : file.name.replace(/\.html$/i, "");
 
-    const randomizeExportMatch = text.match(/<meta name="quiz-randomize-export" content="(true|false)">/i);
-    const randomizeAnswersExportMatch = text.match(/<meta name="quiz-randomize-answers-export" content="(true|false)">/i);
+        const randomizeExportMatch = text.match(/<meta name="quiz-randomize-export" content="(true|false)">/i);
+        const randomizeAnswersExportMatch = text.match(/<meta name="quiz-randomize-answers-export" content="(true|false)">/i);
+        randomizeExport = !randomizeExportMatch || randomizeExportMatch[1].toLowerCase() !== "false";
+        randomizeAnswersExport = !randomizeAnswersExportMatch || randomizeAnswersExportMatch[1].toLowerCase() !== "false";
+      }
 
-    document.getElementById("quizTitle").innerHTML = title;
-    document.getElementById("quizFilename").value = filename;
-    document.getElementById("questionCount").value = questions.length;
-    document.getElementById("randomizePreview").checked = true;
-    document.getElementById("randomizeAnswersPreview").checked = true;
-    document.getElementById("randomizeExport").checked = !randomizeExportMatch || randomizeExportMatch[1].toLowerCase() !== "false";
-    document.getElementById("randomizeAnswersExport").checked = !randomizeAnswersExportMatch || randomizeAnswersExportMatch[1].toLowerCase() !== "false";
-    generateQuestionFields();
-    populateFields(questions, true);
-    alert("Standalone HTML imported successfully.");
+      if (!questions.length) throw new Error("The imported file does not contain any questions.");
+      questions.forEach((question, index) => {
+        if (!question || typeof question !== "object") throw new Error(`Question ${index + 1} is not valid.`);
+        if (!Array.isArray(question.answers) || question.answers.length !== 4) {
+          throw new Error(`Question ${index + 1} must contain exactly 4 answers.`);
+        }
+      });
+
+      document.getElementById("quizTitle").innerHTML = title;
+      document.getElementById("quizFilename").value = filename;
+      document.getElementById("questionCount").value = questions.length;
+      document.getElementById("randomizePreview").checked = true;
+      document.getElementById("randomizeAnswersPreview").checked = true;
+      document.getElementById("randomizeExport").checked = randomizeExport;
+      document.getElementById("randomizeAnswersExport").checked = randomizeAnswersExport;
+      generateQuestionFields();
+      populateFields(questions, true);
+      alert(isJson ? "AI JSON imported successfully." : "Standalone HTML imported successfully.");
+    } catch (error) {
+      console.error("Could not import quiz file:", error);
+      alert(error && error.message ? error.message : "Could not import this quiz file.");
+    }
   });
 }
 
 // ── Shared import helper ───────────────────────────────────
 
+const QB_MATH_ALIGN_ATTRIBUTE = "data-qb-align";
+
+function normaliseImportedRichText(value) {
+  const host = document.createElement("div");
+  host.innerHTML = String(value || "");
+
+  host.querySelectorAll("math").forEach(math => {
+    const displayAttribute = (math.getAttribute("display") || "").trim().toLowerCase();
+    const cssDisplay = (math.style.display || "").trim().toLowerCase();
+    const isDisplayMath = displayAttribute === "block" || cssDisplay === "block";
+
+    if (!isDisplayMath) {
+      // Inline maths must stay in sentence flow. Remove accidental full-width
+      // sizing that some AI conversions add to otherwise-inline MathML.
+      if (math.style.width === "100%") math.style.removeProperty("width");
+      if (math.style.minWidth) math.style.removeProperty("min-width");
+      if (math.style.maxWidth === "100%") math.style.removeProperty("max-width");
+      return;
+    }
+
+    let align = (math.getAttribute(QB_MATH_ALIGN_ATTRIBUTE) || math.style.textAlign || "left")
+      .trim()
+      .toLowerCase();
+    if (!['left', 'center', 'right'].includes(align)) align = "left";
+
+    math.setAttribute("display", "block");
+    math.setAttribute(QB_MATH_ALIGN_ATTRIBUTE, align);
+
+    // Keep the equation on its own line, but make the MathML box intrinsic
+    // width. A normal display:block MathML box can become container-width in
+    // Chromium, which makes <mfrac> draw a fraction bar across the textbox.
+    math.style.setProperty("display", "block");
+    math.style.setProperty("width", "max-content");
+    math.style.setProperty("max-width", "100%");
+    math.style.setProperty("min-width", "0");
+    math.style.setProperty("box-sizing", "border-box");
+    math.style.setProperty("text-align", "left");
+
+    // Remove common AI-added stretching from MathML descendants too. These
+    // properties are not needed for semantic fractions/tables and can turn a
+    // natural-width equation into a full-row rule.
+    math.querySelectorAll("mfrac,mrow,mtable,mtd").forEach(node => {
+      if (node.style.width === "100%") node.style.removeProperty("width");
+      if (node.style.minWidth) node.style.removeProperty("min-width");
+      if (node.style.maxWidth === "100%") node.style.removeProperty("max-width");
+      if (node.style.flexGrow) node.style.removeProperty("flex-grow");
+    });
+
+    if (align === "center") {
+      math.style.setProperty("margin", "0 auto");
+    } else if (align === "right") {
+      math.style.setProperty("margin", "0 0 0 auto");
+    } else {
+      math.style.setProperty("margin", "0 auto 0 0");
+    }
+  });
+
+  return host.innerHTML;
+}
+
 function populateFields(questions, fromStandalone = false) {
   questions.forEach((item, index) => {
     const n = index + 1;
-    setHtml(`question_${n}`, item.question);
+    const questionHtml = fromStandalone ? normaliseImportedRichText(item.question) : item.question;
+    setHtml(`question_${n}`, questionHtml);
 
     item.answers.forEach((answer, ai) => {
-      setHtml(`q${n}_answer_${ai + 1}`, fromStandalone
+      const rawAnswer = fromStandalone
         ? (typeof answer === "string" ? answer : answer.text)
-        : answer
-      );
+        : answer;
+      setHtml(`q${n}_answer_${ai + 1}`, fromStandalone ? normaliseImportedRichText(rawAnswer) : rawAnswer);
     });
 
     if (fromStandalone) {
@@ -1311,7 +1407,9 @@ function populateFields(questions, fromStandalone = false) {
       document.getElementById(`q${n}_correct`).value = item.correctIndex ?? 0;
     }
 
-    setHtml(`q${n}_feedback`, item.feedback || "");
+    setHtml(`q${n}_feedback`, fromStandalone
+      ? normaliseImportedRichText(item.feedback || "")
+      : (item.feedback || ""));
   });
 }
 
@@ -1403,8 +1501,23 @@ function restartBuilder() {
 
 
 // ── Copy AI import prompt to clipboard ────────────────────────
+function updateAiPromptModeUi() {
+  const mode = document.getElementById("aiPromptMode")?.value || "fast";
+  const note = document.getElementById("aiPromptModeNote");
+  const button = document.getElementById("copyPromptButton");
+
+  if (mode === "fidelity") {
+    if (note) note.textContent = "High fidelity: slower, but asks the AI to inspect essential graphs/diagrams, source sizing and equation alignment more closely.";
+    if (button) button.textContent = "Copy High-Fidelity Prompt";
+  } else {
+    if (note) note.textContent = "Fast: extracts wording, answers, feedback and structured maths. The builder normalises predictable MathML layout after import.";
+    if (button) button.textContent = "Copy Fast Prompt";
+  }
+}
+
 async function copyAiPrompt() {
-  const promptField = document.getElementById("aiPrompt");
+  const mode = document.getElementById("aiPromptMode")?.value || "fast";
+  const promptField = document.getElementById(mode === "fidelity" ? "aiPromptFidelity" : "aiPromptFast");
   const button = document.getElementById("copyPromptButton");
   if (!promptField) return;
 
@@ -1434,10 +1547,9 @@ async function copyAiPrompt() {
     if (button) button.textContent = "Copy failed";
   }
 
-  window.setTimeout(() => {
-    if (button) button.textContent = "Copy Prompt";
-  }, 2200);
+  setTimeout(updateAiPromptModeUi, 1400);
 }
+
 
 // ── HTML → docx TextRuns (browser) ────────────────────────────
 function htmlToRuns(html) {
@@ -2910,6 +3022,7 @@ function resizeBuilderCanvas() {
 
 window.addEventListener("DOMContentLoaded", () => {
   installBuilderViewportFitStyles();
+  updateAiPromptModeUi();
   const toolbar = document.getElementById("sharedToolbar");
   toolbar.classList.add("inactive");
   toolbar.addEventListener("mousedown", event => {

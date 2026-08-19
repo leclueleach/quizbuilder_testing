@@ -108,7 +108,7 @@
 .question-editable p,.answer-inner p,.feedback-editable p{margin:0}
 .question-editable ul,.question-editable ol,.answer-inner ul,.answer-inner ol,.feedback-editable ul,.feedback-editable ol{margin:0;padding-left:1.35em}
 .question-editable math,.answer-inner math,.feedback-editable math{vertical-align:baseline}
-.question-editable math[display="block"],.answer-inner math[display="block"],.feedback-editable math[display="block"]{display:block;text-align:left;margin:0}
+.question-editable math[display="block"],.answer-inner math[display="block"],.feedback-editable math[display="block"]{display:block;width:max-content;max-width:100%;min-width:0;box-sizing:border-box;text-align:left;margin:0 auto 0 0}
 
 /* Global feedback visibility control */
 .feedback-default-toggle{white-space:nowrap}
@@ -118,3 +118,8 @@
 /* Keep authoring scrollbars compact so they do not materially change wrapping. */
 .editable.has-overflow::-webkit-scrollbar,.editable.has-horizontal-overflow::-webkit-scrollbar{width:6px;height:6px}
 .editable.has-overflow::-webkit-scrollbar-thumb,.editable.has-horizontal-overflow::-webkit-scrollbar-thumb{background:#8fa3ae;border-radius:6px}
+
+/* AI conversion mode controls */
+.ai-import-help-content>label{display:block;font-size:12px;font-weight:500;margin:10px 0 6px}
+.ai-import-help-content>select{width:100%;padding:8px;border:1px solid #b9c8d0;border-radius:6px;background:#fff;color:var(--title)}
+.ai-prompt-mode-note{margin-top:7px!important;color:#607786!important}
