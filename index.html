@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Quiz Builder</h1>
+      <p>Build and export a platform-ready CourseBook quiz.</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="secondary" onclick="previewQuiz()">Preview Quiz</button>
+      <button type="button" class="secondary" onclick="validateQuiz(true)">Validate</button>
+      <button type="button" class="secondary feedback-default-toggle" id="feedbackDefaultToggle" aria-pressed="false" onclick="toggleAllBuilderFeedback()">Show all feedback</button>
+      <button type="button" onclick="exportStandaloneQuiz()">Export Quiz</button>
+    </div>
+  </header>
+
+  <main id="builder" class="builder-layout">
+    <aside class="settings-panel">
+      <h2>Quiz settings</h2>
+      <label for="quizFilename">Folder/output name</label>
+      <input type="text" id="quizFilename" placeholder="chapter3_review">
+
+      <label for="questionCount">Number of questions</label>
+      <select id="questionCount">
+        <option value="5">5 Questions</option>
+        <option value="10">10 Questions</option>
+      </select>
+      <button type="button" onclick="resetQuiz()">Create / Reset Quiz</button>
+
+      <details class="advanced-settings">
+        <summary>Advanced settings</summary>
+        <label class="check-row" for="randomizePreview">
+          <input type="checkbox" id="randomizePreview" checked>
+          Randomise question order in preview
+        </label>
+        <p class="setting-note">Uncheck this when you need to review the questions in builder order.</p>
+
+        <label class="check-row" for="randomizeAnswersPreview">
+          <input type="checkbox" id="randomizeAnswersPreview" checked>
+          Randomise answer options in preview
+        </label>
+        <p class="setting-note">Uncheck this to keep Answer 1 to Answer 4 in builder order during preview.</p>
+
+        <label class="check-row" for="randomizeExport">
+          <input type="checkbox" id="randomizeExport" checked>
+          Randomise question order in export
+        </label>
+        <p class="setting-note">Keep this checked for normal platform exports.</p>
+
+        <label class="check-row" for="randomizeAnswersExport">
+          <input type="checkbox" id="randomizeAnswersExport" checked>
+          Randomise answer options in export
+        </label>
+        <p class="setting-note">Keep this checked for normal platform exports.</p>
+      </details>
+
+      <div class="correct-answer-control" id="correctAnswerControl">
+        <label for="activeCorrectAnswer">Correct answer</label>
+        <select id="activeCorrectAnswer" onchange="updateActiveCorrectAnswer(this.value)">
+          <option value="0">Answer 1</option>
+          <option value="1">Answer 2</option>
+          <option value="2">Answer 3</option>
+          <option value="3">Answer 4</option>
+        </select>
+      </div>
+
+      <hr>
+      <label for="importHtmlFile">Import standalone HTML</label>
+      <input type="file" id="importHtmlFile" accept=".html">
+      <button type="button" class="secondary" onclick="importStandaloneHtml()">Import HTML</button>
+
+      <details class="ai-import-help">
+        <summary id="aiImportHelpTitle">Convert a Word or PowerPoint quiz</summary>
+        <div class="ai-import-help-content">
+          <p>To convert a Word or PowerPoint quiz file into this builder:</p>
+          <ol>
+            <li>Copy the prompt below.</li>
+            <li>Open <a href="https://claude.ai/" target="_blank" rel="noopener noreferrer">Claude</a> or <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPT</a>.</li>
+            <li>Paste the prompt and upload your <strong>.docx</strong> or <strong>.pptx</strong> file.</li>
+            <li>Download the HTML file the AI returns.</li>
+            <li>Use <strong>Import Standalone HTML</strong> above to load it into the builder.</li>
+          </ol>
+          <button type="button" class="secondary copy-prompt-button" id="copyPromptButton" onclick="copyAiPrompt()">Copy Prompt</button>
+          <textarea id="aiPrompt" class="visually-hidden" aria-hidden="true" tabindex="-1">I have a quiz in the attached Word/PowerPoint file. Please convert it into the following standalone HTML format so I can import it into my quiz builder.
+
+IMPORTANT RULES — CONTENT AND VISUAL FIDELITY:
+- Extract every question, all 4 answer options, which answer is correct, and the feedback text.
+- Treat the source file as the visual authority. Preserve the source wording, line/paragraph breaks, emphasis and mathematical notation as closely as possible.
+- Do NOT improve, modernise, restyle, simplify or embellish the source. Do not add bold, italic, underline, colours, font sizes, margins, padding, extra blank lines, extra paragraph wrappers or other styling unless that styling is clearly present in the source.
+- Preserve only formatting that is genuinely visible in the source: bold, italic, underline, superscript, subscript, lists and special characters (±, ×, ÷, π, √, °, ≤, ≥).
+- Keep normal prose as plain HTML text whenever possible. Do not wrap ordinary single lines in unnecessary &lt;p&gt;, &lt;div&gt; or &lt;span&gt; elements. Add a block/line break only where the source visibly has one.
+
+MATHEMATICS — VERY IMPORTANT:
+- Preserve the visual mathematical structure from the Word/PowerPoint source as closely as possible. Do not rewrite a professionally formatted equation as plain text merely because the meaning is equivalent.
+- For structured equations, use semantic MathML inside the question/answer/feedback HTML strings. Use the appropriate MathML structures for fractions, roots, superscripts, subscripts, combined scripts, brackets, matrices/tables, limits, operators and nested expressions.
+- Preserve stacked fractions as stacked fractions, roots with their full radicands, and the original grouping/bracket structure. Do not flatten a fraction to a/b, do not replace a structured equation with Unicode-only text, and do not simplify, solve, rearrange or reinterpret any equation.
+- Use &lt;mi&gt; for mathematical identifiers/variables, &lt;mn&gt; for numbers, &lt;mo&gt; for operators and &lt;mtext&gt; only for upright words that are genuinely part of the equation.
+- Do NOT add MathML styling such as font-size, font-weight, colour, margins, padding, transforms, mathvariant or &lt;mstyle&gt; unless the source visibly requires it. Let the quiz builder supply the surrounding typography.
+- Match whether maths is inline or displayed on its own line. Use display='block' only when the source equation is visibly on a separate line. Do not turn inline maths into display maths.
+- Inline maths MUST remain part of the surrounding sentence/line. Never put inline MathML in its own &lt;div&gt;, &lt;p&gt; or line merely because it is an equation. Do not split prose into separate layout fragments around inline maths.
+- Example: if the source shows “f(x) = −6x + 8 for a given x value of 2.” on one line, keep that whole sequence in one normal inline flow with the MathML embedded between the words. Do not wrap the formula-and-prose line in a separate &lt;div&gt;.
+- A display equation being on its own line does NOT mean it should automatically be centred. Browser MathML often centres display equations by default. Preserve the source horizontal alignment explicitly: for a source equation that is on its own line and left aligned, use &lt;math display='block' style='display:block;text-align:left;margin:0'&gt;...&lt;/math&gt;. Use text-align:center only when the source equation is visibly centred.
+- Preserve the source sequence and spacing around equations. Do not insert extra blank lines before or after display equations.
+- When MathML attributes are needed inside a JSON string, use single quotes for the HTML attribute values where practical, or correctly escape any double quotes so the JavaScript array remains valid JSON.
+
+DIAGRAMS, GRAPHS AND IMAGES — VERY IMPORTANT:
+- Reproduce diagrams/graphs/images only when they actually appear inside the question, answer or feedback content. Do not invent decorative visuals.
+- If a PowerPoint visual is made from grouped shapes, lines and labels, reproduce it as SVG rather than approximating it with a different-looking graph. Match the original geometry, colours, line styles, arrowheads, dashed lines, label positions, font family, font weight and relative font size.
+- Preserve the visual's displayed size AND its horizontal alignment/indent relative to the source text box. If it is centred, centred-within-an-indent, or deliberately left/right aligned in the source, reproduce that placement; do not automatically left-align or centre it. Inline layout styling is allowed for a source visual only when needed to reproduce that original placement.
+- Preserve the visual's displayed size relative to the source slide. For a PowerPoint slide, map source dimensions to the quiz builder's 720 × 540 design canvas: targetWidth = sourceVisualWidth / sourceSlideWidth × 720 and targetHeight = sourceVisualHeight / sourceSlideHeight × 540. Do not enlarge a source visual.
+- The builder's question box is 426 × 140 px on that 720 × 540 canvas, with approximately 396 × 130 px of usable inner space. Any visual placed inside the question text must fit inside the remaining space together with the question text. It must never extend outside or be clipped by the question box.
+- Do not choose an arbitrary large SVG width/height merely because the SVG viewBox is large. The rendered width/height must match the source visual's displayed size. If a larger viewBox is used, compensate the SVG font sizes and stroke widths so the rendered result still matches the source.
+- Do not substitute Arial or another font if the source uses a different font. Inspect and preserve the source font where possible; otherwise inherit the surrounding quiz font rather than inventing a new one.
+- For raster images, preserve aspect ratio. Never stretch, crop or enlarge an image unless the source itself does so.
+
+DATA RULES:
+- If there is no feedback for a question, leave the feedback field as an empty string "".
+- Output ONLY the HTML file — no explanation and no markdown code fences.
+
+The HTML file must contain this exact JavaScript data structure:
+
+const originalQuizData = [
+  {
+    "question": "Question text here (HTML and MathML are allowed)",
+    "answers": [
+      "Answer 1 text",
+      "Answer 2 text",
+      "Answer 3 text",
+      "Answer 4 text"
+    ],
+    "correctIndex": 0,
+    "feedback": "Feedback text here"
+  }
+];
+
+Where correctIndex is 0 for Answer 1, 1 for Answer 2, 2 for Answer 3, 3 for Answer 4.
+
+Example of the required maths approach: a source fraction with x squared over y should remain a real fraction using MathML such as &lt;math&gt;&lt;mfrac&gt;&lt;msup&gt;&lt;mi&gt;x&lt;/mi&gt;&lt;mn&gt;2&lt;/mn&gt;&lt;/msup&gt;&lt;mi&gt;y&lt;/mi&gt;&lt;/mfrac&gt;&lt;/math&gt;, not plain text like x²/y.
+
+Wrap it in this minimal HTML shell:
+
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;Quiz Title Here&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;script&gt;
+const originalQuizData = [ ... your data here ... ];
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+Before returning the file, compare every generated question visually against the source slide/page. In particular, verify equation layout, source emphasis, paragraph breaks, diagram size and diagram proportions. If your generated HTML introduces styling that is not visibly present in the source, remove it.
+
+Please convert the attached file now and return only the HTML file.</textarea>
+        </div>
+      </details>
+    </aside>
+
+    <section class="workspace">
+      <div class="shared-toolbar" id="sharedToolbar" aria-label="Text formatting toolbar">
+        <span id="activeFieldLabel">Select a text field</span>
+        <select id="fontSizeControl" aria-label="Font size" onchange="formatActiveFontSize(this.value)">
+          <option value="">Size</option>
+          <option value="40">40</option><option value="32">32</option><option value="24">24</option>
+          <option value="20">20</option><option value="18">18</option><option value="16">16</option>
+          <option value="14.67">14.67</option><option value="14">14</option>
+          <option value="13.33">13.33</option><option value="13">13</option><option value="12">12</option>
+        </select>
+        <select id="lineSpacingControl" aria-label="Line spacing" title="Line spacing" onchange="formatActiveLineSpacing(this.value)">
+          <option value="1">Single</option>
+          <option value="1.15">1.15</option>
+          <option value="1.5">1.5</option>
+          <option value="2">Double</option>
+        </select>
+        <button type="button" id="formatBoldButton" data-command="bold" aria-label="Bold" aria-pressed="false" onclick="formatActiveText('bold')"><b>B</b></button>
+        <button type="button" id="formatItalicButton" data-command="italic" aria-label="Italic" aria-pressed="false" onclick="formatActiveText('italic')"><i>I</i></button>
+        <button type="button" id="formatUnderlineButton" data-command="underline" aria-label="Underline" aria-pressed="false" onclick="formatActiveText('underline')"><u>U</u></button>
+        <button type="button" id="formatSuperscriptButton" data-command="superscript" aria-label="Superscript" aria-pressed="false" onclick="formatActiveText('superscript')">X²</button>
+        <button type="button" id="formatSubscriptButton" data-command="subscript" aria-label="Subscript" aria-pressed="false" onclick="formatActiveText('subscript')">X₂</button>
+        <button type="button" id="formatUnorderedListButton" data-command="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false" onclick="formatActiveText('insertUnorderedList')">• List</button>
+        <button type="button" id="formatOrderedListButton" data-command="insertOrderedList" aria-label="Numbered list" aria-pressed="false" onclick="formatActiveText('insertOrderedList')">1. List</button>
+        <select id="symbolControl" onchange="insertActiveSymbol(this.value)">
+          <option value="">Symbol</option><option>²</option><option>³</option><option>₀</option><option>₁</option>
+          <option>₂</option><option>₃</option><option>°</option><option>±</option><option>×</option>
+          <option>÷</option><option>≤</option><option>≥</option><option>√</option><option>π</option>
+        </select>
+        <button type="button" id="htmlModeButton" aria-label="Toggle HTML editor" aria-expanded="false" aria-pressed="false" onclick="toggleActiveHtmlMode()">&lt;/&gt;</button>
+      </div>
+
+      <nav id="questionTabs" class="page-navigation"></nav>
+      <div id="canvasWorkbench" class="canvas-workbench">
+        <div id="questionsContainer" class="canvas-area"></div>
+        <aside id="htmlEditorPanel" class="html-editor-panel" aria-hidden="true" aria-label="HTML editor">
+          <div class="html-editor-header">
+            <div>
+              <strong>HTML editor</strong>
+              <span id="htmlEditorFieldLabel">Selected text field</span>
+            </div>
+            <button type="button" class="html-editor-close" onclick="closeHtmlEditorPanel()">Close</button>
+          </div>
+          <textarea id="sharedHtmlEditor" class="shared-html-code-editor" aria-label="HTML source" spellcheck="false"></textarea>
+          <p class="html-editor-note">Changes update the selected text box immediately.</p>
+        </aside>
+      </div>
+      <div class="page-controls">
+        <button type="button" class="secondary" onclick="moveBuilderPage(-1)">Previous</button>
+        <span id="pageIndicator"></span>
+        <button type="button" class="secondary" onclick="moveBuilderPage(1)">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

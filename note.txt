@@ -1,0 +1,5 @@
+Quiz Builder V7
+- Preview and platform export share the same learner styling.
+- Platform export keeps the working outer-folder and story.html structure.
+- Export packages PNG files from img/.
+- Run through Live Server when exporting.

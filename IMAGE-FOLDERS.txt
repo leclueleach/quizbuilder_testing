@@ -1,0 +1,12 @@
+IMAGE FOLDERS
+=============
+
+assets/
+  Used by the builder canvas and Preview.
+  Keeps descriptive PNG filenames and subfolders.
+
+img/
+  Used by the platform-compatible Export.
+  Contains PNG copies renamed to the filenames used by story.html.
+
+The Preview and exported quiz now use the same visual images.
